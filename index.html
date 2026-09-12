@@ -1,0 +1,167 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#110b16" />
+<title>EGO No Limits 18+</title>
+<link rel="manifest" href="manifest.json" />
+<link rel="apple-touch-icon" href="icons/icon-192.png" />
+<meta name="apple-mobile-web-app-capable" content="yes" />
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+<meta name="apple-mobile-web-app-title" content="EGO No Limits" />
+<style>
+:root{--bg:#110b16;--card:#1a1122;--card2:#24172f;--text:#fff7fb;--muted:#cbb9c7;--accent:#ff4f9a;--accent2:#b967ff;--good:#40d6a2;--shadow:0 18px 60px rgba(0,0,0,.35)}
+*{box-sizing:border-box} body{margin:0;font-family:Inter,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;background:radial-gradient(circle at 20% 0%,#2b1638 0,#110b16 46%,#08060b 100%);color:var(--text);min-height:100vh}
+.app{max-width:720px;margin:0 auto;padding:calc(env(safe-area-inset-top) + 18px) 18px calc(env(safe-area-inset-bottom) + 24px)}
+header{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:18px}.brand h1{font-size:clamp(28px,7vw,44px);line-height:.95;margin:0}.brand small{display:block;color:var(--muted);margin-top:8px;font-weight:700;letter-spacing:.06em}.pill{background:#2b1837;border:1px solid #4a2a5f;color:#ffd9e9;padding:8px 12px;border-radius:999px;font-weight:800;font-size:12px;white-space:nowrap}
+.panel{background:linear-gradient(180deg,rgba(37,23,48,.98),rgba(24,15,31,.98));border:1px solid rgba(255,255,255,.08);border-radius:24px;padding:20px;box-shadow:var(--shadow)}
+.toprow{display:flex;justify-content:space-between;align-items:center;color:var(--muted);font-weight:800;font-size:13px}.counter{color:#ffd2e5}.question{font-size:clamp(24px,6vw,36px);line-height:1.12;font-weight:900;margin:24px 0 22px}.answers{display:grid;gap:12px}.answer{width:100%;text-align:left;border:1px solid rgba(255,255,255,.09);background:var(--card2);color:var(--text);padding:17px 16px;border-radius:18px;font-size:18px;font-weight:800;display:flex;gap:12px;align-items:center;transition:.18s transform,.18s border,.18s background}.answer:active{transform:scale(.985)}.answer.selected{border-color:var(--accent);background:linear-gradient(90deg,#4a1836,#3a1e51)}.letter{width:34px;height:34px;display:grid;place-items:center;border-radius:11px;background:#130d18;color:#ff9ec8;font-weight:1000;flex:0 0 auto}
+.controls{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:16px}.btn{border:0;border-radius:16px;padding:15px 14px;font-weight:900;font-size:16px}.btn.primary{background:linear-gradient(135deg,var(--accent),var(--accent2));color:white}.btn.secondary{background:#21162a;color:#f8eefa;border:1px solid rgba(255,255,255,.08)}
+.status{margin-top:14px;color:var(--muted);font-size:13px;text-align:center;min-height:18px}.footer{margin-top:16px;text-align:center;color:#89798a;font-size:12px}.hidden{display:none}.setup{margin-bottom:14px}.setup label{display:block;color:var(--muted);font-weight:800;font-size:13px;margin-bottom:8px}.setup input,.setup select{width:100%;background:#160e1d;color:white;border:1px solid rgba(255,255,255,.09);border-radius:14px;padding:13px;font-size:16px}.scoreboard{margin-top:14px;display:flex;gap:8px;flex-wrap:wrap}.score{background:#17101e;border:1px solid rgba(255,255,255,.08);padding:8px 10px;border-radius:12px;font-size:13px;font-weight:800;color:#e9d8e5}
+@media (max-width:480px){.controls{grid-template-columns:1fr}.panel{padding:17px;border-radius:20px}.answer{font-size:17px;padding:15px}}
+</style>
+</head>
+<body>
+<div class="app">
+<header><div class="brand"><h1>EGO<br>NO LIMITS 🔞</h1><small>18+ PARTY EDITION</small></div><div class="pill">100 FRAGEN</div></header>
+
+<div class="panel setup" id="setupPanel">
+<label for="playerName">Spieler am Zug</label>
+<input id="playerName" placeholder="z. B. Kevin" maxlength="22" />
+<div style="height:10px"></div>
+<label for="mode">Modus</label>
+<select id="mode"><option value="random">Zufällige Fragen</option><option value="ordered">Der Reihe nach</option></select>
+<div class="controls"><button class="btn primary" id="startBtn">Spiel starten</button><button class="btn secondary" id="shuffleBtn">Fragen mischen</button></div>
+</div>
+
+<div class="panel hidden" id="gamePanel">
+<div class="toprow"><span id="playerLabel">Spieler</span><span class="counter" id="counter">1 / 100</span></div>
+<div class="question" id="question"></div>
+<div class="answers" id="answers"></div>
+<div class="controls"><button class="btn secondary" id="revealBtn">Antwort merken</button><button class="btn primary" id="nextBtn">Nächste Frage</button></div>
+<div class="status" id="status">Wähle A, B oder C.</div>
+<div class="scoreboard"><span class="score">🔥 Auswahl: <b id="picked">–</b></span><span class="score">🎲 Modus: <b id="modeLabel">Zufall</b></span></div>
+</div>
+<div class="footer">Nur für Erwachsene · freiwillig spielen · Grenzen respektieren</div>
+</div>
+<script>
+const questions = [
+["Hast du eine sexuelle Fantasie, die du deinem Partner niemals erzählen würdest?","Ja, definitiv","Vielleicht eine","Nein"],
+["Würdest du dich bei einem Dreier wohler fühlen, wenn du die dritte Person kennst?","Ja","Lieber fremd","Gar keinen Dreier"],
+["Würdest du einen Vierer oder Gruppensex ausprobieren?","Ja","Vielleicht einmal","Niemals"],
+["Reizt dich die Vorstellung, beim Sex beobachtet zu werden?","Sehr","Als Fantasie","Überhaupt nicht"],
+["Reizt dich die Vorstellung, andere beim Sex zu beobachten, wenn alle Beteiligten einverstanden sind?","Ja","Vielleicht","Nein"],
+["Würdest du dich bewusst nackt vor anderen Erwachsenen zeigen, wenn es Teil eines erotischen Spiels wäre?","Ja","Vielleicht","Niemals"],
+["Würdest du einen Swingerclub besuchen?","Sofort","Aus Neugier vielleicht","Niemals"],
+["Würdest du dort auch mit anderen Personen etwas anfangen?","Ja","Erst einmal nur schauen","Nein"],
+["Würdest du deinen Partner mit jemand anderem teilen?","Ja","Vielleicht unter Regeln","Auf gar keinen Fall"],
+["Würde es dich reizen, wenn dein Partner vor deinen Augen mit jemand anderem flirtet?","Ja","Vielleicht","Nein"],
+["Würde dich sexuelle Eifersucht manchmal sogar anmachen?","Ja","Schwer zu sagen","Nein"],
+["Würdest du deinem Partner erlauben, dir beim Sex komplett die Kontrolle abzunehmen?","Ja","Mit klaren Grenzen","Nein"],
+["Würdest du selbst gerne komplett die Kontrolle übernehmen?","Sehr gerne","Vielleicht","Nein"],
+["Reizen dich Machtspiele im Bett?","Sehr","Ein bisschen","Gar nicht"],
+["Würdest du gerne einmal gefesselt sein?","Ja","Vielleicht","Nein"],
+["Würdest du deinen Partner fesseln?","Ja","Vielleicht","Nein"],
+["Würdest du eine Augenbinde benutzen?","Ja","Vielleicht","Nein"],
+["Würdest du Schmerz als Teil eines einvernehmlichen erotischen Spiels ausprobieren?","Ja","Leicht vielleicht","Niemals"],
+["Hast du schon einmal einen Fetisch entdeckt, bei dem du selbst überrascht warst?","Ja","Vielleicht","Nein"],
+["Gibt es etwas, das du nur in Pornos heiß findest, aber niemals selbst machen würdest?","Ja, einiges","Ein oder zwei Sachen","Nein"],
+["Würdest du deiner Runde ehrlich deine Pornovorlieben zeigen?","Ja","Niemals","Ich müsste danach das Land verlassen"],
+["Hast du schon einmal Pornos angesehen, deren Kategorie dir im Nachhinein peinlich war?","Ja","Vielleicht","Nein"],
+["Würdest du deinem Partner deine komplette Pornohistorie zeigen?","Ja","Teile davon","Auf keinen Fall"],
+["Hast du schon einmal masturbiert und dabei an jemanden gedacht, mit dem du regelmäßig Kontakt hast?","Ja","Vielleicht","Nein"],
+["Sitzt diese Person möglicherweise gerade mit im Raum?","Ja","Vielleicht 😶","Nein"],
+["Würdest du offen sagen, wer es ist?","Ja","Nur anonym","Niemals"],
+["Hast du schon einmal sexuelle Fantasien über einen Arbeitskollegen gehabt?","Ja","Vielleicht","Nein"],
+["Über den Partner oder die Partnerin eines Freundes?","Ja","Vielleicht","Niemals"],
+["Über einen guten Freund oder eine gute Freundin?","Ja","Vielleicht","Nein"],
+["Würdest du eine Freundschaft riskieren, wenn die sexuelle Spannung extrem wäre?","Ja","Vielleicht","Nein"],
+["Hast du schon einmal jemanden nur deshalb weitergetroffen, weil der Sex gut war?","Ja","Fast","Nein"],
+["Würdest du das wieder tun?","Ja","Vielleicht","Nein"],
+["Gibt es einen Ex, mit dem du sofort wieder schlafen würdest, obwohl die Beziehung katastrophal war?","Ja","Vielleicht","Nein"],
+["Würdest du Sex mit jemandem haben, den du menschlich nicht ausstehen kannst, aber körperlich extrem attraktiv findest?","Ja","Vielleicht","Niemals"],
+["Würdest du einen reinen Sexkontakt ohne Dates oder Beziehung wollen?","Ja","Vielleicht","Nein"],
+["Könntest du mehrere solcher Kontakte gleichzeitig haben?","Ja","Vielleicht","Nein"],
+["Würdest du deinem Partner erlauben, erotische Bilder von dir zu machen?","Ja","Nur ohne Gesicht","Nein"],
+["Würdest du dich filmen lassen?","Ja","Nur unter sehr sicheren Bedingungen","Niemals"],
+["Würdest du dir solche Aufnahmen später gemeinsam ansehen?","Ja","Vielleicht","Nein"],
+["Hast du schon einmal Sexting betrieben, das deutlich härter war als dein echtes Sexleben?","Ja","Vielleicht","Nein"],
+["Hast du schon einmal eine Nachricht geschrieben, die du niemals laut aussprechen würdest?","Ja","Mehrfach","Nein"],
+["Würdest du einem Fremden anonym sexuelle Fantasien erzählen?","Ja","Vielleicht","Niemals"],
+["Reizt dich Anonymität sexuell?","Sehr","Ein bisschen","Nein"],
+["Würdest du einen anonymen Erwachsenen-Chat ausprobieren?","Ja","Vielleicht","Nein"],
+["Würdest du mit jemandem schlafen, dessen richtigen Namen du nicht kennst?","Ja","Vielleicht","Nein"],
+["Würdest du bewusst einen One-Night-Stand im Urlaub suchen?","Ja","Vielleicht","Niemals"],
+["Würdest du jemanden nach Hause nehmen, den du erst seit einer Stunde kennst?","Ja","Bei extremer Chemie","Nein"],
+["Hast du schon einmal Sex gehabt, den du direkt danach bereut hast?","Ja","Beinahe","Nein"],
+["Hast du schon einmal Sex nur aus Langeweile gehabt?","Ja","Fast","Nein"],
+["Hast du schon einmal jemanden nur benutzt, weil du gerade Lust hattest?","Ja","Vielleicht","Nein"],
+["Würdest du eine offene Beziehung ausprobieren?","Ja","Vielleicht mit Regeln","Niemals"],
+["Könntest du damit umgehen, wenn dein Partner regelmäßig mit anderen schläft?","Ja","Weiß ich nicht","Nein"],
+["Würdest du selbst diese Freiheit nutzen?","Ja","Vielleicht","Nein"],
+["Würdest du Sexpartys ausprobieren?","Ja","Einmal aus Neugier","Niemals"],
+["Würdest du dort lieber aktiv mitmachen oder beobachten?","Mitmachen","Beobachten","Weder noch"],
+["Würdest du erotische Rollenspiele mit deinem Partner ausprobieren?","Ja","Vielleicht","Nein"],
+["Würdest du dabei eine völlig andere Persönlichkeit spielen?","Ja","Vielleicht","Nein"],
+["Würdest du spezielle Kleidung oder Kostüme tragen?","Gerne","Wenn mein Partner es möchte","Nein"],
+["Reizt dich Latex/Leder/Fetischkleidung?","Ja","Ein bisschen","Nein"],
+["Würdest du Geld für hochwertiges Sexspielzeug ausgeben?","Definitiv","Vielleicht","Nein"],
+["Besitzt du etwas, von dem deine Freunde überrascht wären?","Ja","Vielleicht","Nein"],
+["Würdest du Sexspielzeug gemeinsam mit einem Partner kaufen gehen?","Ja","Online lieber","Nein"],
+["Würdest du deinem Partner deinen geheimsten Fetisch offenbaren?","Ja","Nur nach langer Beziehung","Niemals"],
+["Würdest du eine Fantasie deines Partners ausprobieren, die dir selbst nichts gibt?","Ja","Nur wenn ich mich wohlfühle","Nein"],
+["Gibt es etwas Sexuelles, das dich allein deshalb reizt, weil es gesellschaftlich als tabu gilt?","Ja","Vielleicht","Nein"],
+["Findest du heimlichen Sex reizvoller als normalen Sex?","Ja","Manchmal","Nein"],
+["Würdest du Sex an einem halböffentlichen Ort riskieren?","Ja","Vielleicht","Niemals"],
+["Würde die Gefahr, entdeckt zu werden, dich eher anmachen?","Ja","Vielleicht","Nein"],
+["Würdest du in einem Hotel bewusst die Vorhänge offenlassen, wenn niemand unfreiwillig einbezogen wird?","Ja","Vielleicht","Nein"],
+["Würdest du erotische Fotos an einem ungewöhnlichen Ort machen?","Ja","Vielleicht","Nein"],
+["Hast du schon einmal jemanden absichtlich mit deinem Körper provoziert?","Ja","Vielleicht","Nein"],
+["Hast du schon einmal Kleidung bewusst gewählt, weil du wusstest, dass eine bestimmte Person darauf steht?","Ja","Vielleicht","Nein"],
+["Hast du schon einmal jemanden heiß gemacht, obwohl du nie vorhattest, etwas mit ihm zu machen?","Ja","Vielleicht","Nein"],
+["Reizt dich sexuelle Kontrolle über eine andere Person?","Ja","Ein bisschen","Nein"],
+["Reizt dich das Gegenteil – komplett ausgeliefert zu sein, aber innerhalb klarer Grenzen?","Ja","Vielleicht","Nein"],
+["Würdest du deinem Partner ein Safeword überlassen und ansonsten sehr weit gehen?","Ja","Vielleicht","Nein"],
+["Könntest du dominante oder devote Rollen über längere Zeit spannend finden?","Ja","Vielleicht","Nein"],
+["Würdest du einen ganzen Abend nach erotischen Regeln verbringen?","Ja","Vielleicht","Nein"],
+["Würdest du deinem Partner Aufgaben oder Challenges geben?","Ja","Vielleicht","Nein"],
+["Würdest du selbst solche Aufgaben annehmen?","Ja","Vielleicht","Nein"],
+["Hast du schon einmal über Sex mit mehreren Personen gleichzeitig fantasiert?","Ja","Vielleicht","Nein"],
+["Würdest du lieber:","Dreier","Gruppensex","Beides nicht"],
+["Würdest du beim Dreier jemanden bevorzugen, den du bereits attraktiv findest?","Ja","Lieber fremd","Kein Dreier"],
+["Könntest du dabei mit Eifersucht umgehen?","Ja","Vielleicht schwierig","Nein"],
+["Könntest du deinen Partner dabei beobachten, ohne einzugreifen?","Ja","Vielleicht","Niemals"],
+["Würdest du Sex mit einer Person ausprobieren, deren Geschlecht normalerweise nicht deinem üblichen Beuteschema entspricht?","Ja","Aus Neugier vielleicht","Nein"],
+["Hast du schon einmal darüber nachgedacht?","Ja","Vielleicht","Nein"],
+["Würdest du einen Kink ausprobieren, von dem du heute behauptest, dass er gar nicht dein Ding ist?","Ja","Vielleicht","Niemals"],
+["Hast du jemals deine eigenen Grenzen sexuell falsch eingeschätzt?","Ja","Vielleicht","Nein"],
+["Gibt es eine Sache, die du früher eklig fandest und heute interessant findest?","Ja","Vielleicht","Nein"],
+["Würdest du deinem Partner erlauben, eine sexuelle Wunschliste für euch zu schreiben?","Ja","Vielleicht","Nein"],
+["Würdest du jeden Punkt davon lesen wollen?","Unbedingt","Vielleicht lieber nicht alles","Nein"],
+["Würdest du selbst eine komplett ehrliche Wunschliste schreiben?","Ja","Nur teilweise","Niemals"],
+["Würdest du sie dieser Runde zeigen?","Ja","Nie im Leben","Ich würde sie vorher verbrennen"],
+["Gibt es eine Person aus deiner Vergangenheit, mit der du heute sofort noch einmal eine Nacht verbringen würdest?","Ja","Vielleicht","Nein"],
+["Gibt es jemanden in deinem aktuellen Umfeld, bei dem du nur auf ein eindeutiges Signal wartest?","Ja","Vielleicht","Nein"],
+["Sitzt diese Person möglicherweise gerade mit am Tisch?","Ja","Vielleicht 😈","Nein"],
+["Würdest du eine Freundschaft zerstören, wenn die sexuelle Chemie zu stark wäre?","Ja","Vielleicht","Nein"],
+["Gibt es eine Antwort in diesem Spiel, bei der du bewusst gelogen hast?","Ja","Vielleicht","Nein"],
+["Wenn diese Runde deine kompletten echten sexuellen Fantasien kennen würde – wie schlimm wäre es?","Ich könnte nie wiederkommen","Es gäbe einige Schocks","Ziemlich unspektakulär"]
+];
+let order=[...questions.keys()], pos=0, selected=null, started=false;
+const qEl=document.getElementById('question'), aEl=document.getElementById('answers'), counter=document.getElementById('counter'), status=document.getElementById('status'), picked=document.getElementById('picked');
+function shuffle(arr){for(let i=arr.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[arr[i],arr[j]]=[arr[j],arr[i]]}return arr}
+function render(){const idx=order[pos]; const q=questions[idx]; qEl.textContent=q[0]; aEl.innerHTML=''; ['A','B','C'].forEach((l,i)=>{const b=document.createElement('button');b.className='answer';b.innerHTML=`<span class="letter">${l}</span><span>${q[i+1]}</span>`;b.onclick=()=>{selected=l;document.querySelectorAll('.answer').forEach(x=>x.classList.remove('selected'));b.classList.add('selected');picked.textContent=l;status.textContent=`${document.getElementById('playerName').value||'Spieler'} hat ${l} gewählt.`};aEl.appendChild(b)});counter.textContent=`${pos+1} / ${questions.length}`;selected=null;picked.textContent='–';status.textContent='Wähle A, B oder C.'}
+document.getElementById('shuffleBtn').onclick=()=>{shuffle(order);status.textContent='Fragen wurden gemischt.'};
+document.getElementById('startBtn').onclick=()=>{if(document.getElementById('mode').value==='random') shuffle(order); document.getElementById('setupPanel').classList.add('hidden');document.getElementById('gamePanel').classList.remove('hidden');document.getElementById('playerLabel').textContent=document.getElementById('playerName').value||'Spieler am Zug';document.getElementById('modeLabel').textContent=document.getElementById('mode').value==='random'?'Zufall':'Reihe';started=true;render()};
+document.getElementById('nextBtn').onclick=()=>{pos=(pos+1)%order.length;render()};
+document.getElementById('revealBtn').onclick=()=>{status.textContent=selected?`Antwort gespeichert: ${selected}. Jetzt dürfen die anderen raten.`:'Erst eine Antwort auswählen.'};
+</script>
+
+<script>
+if ('serviceWorker' in navigator) {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./service-worker.js').catch(()=>{}));
+}
+</script>
+</body>
+</html>
