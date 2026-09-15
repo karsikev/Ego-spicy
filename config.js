@@ -1,5 +1,5 @@
-// Supabase project settings. Fill these two values from Project Settings -> API / Connect.
+// Supabase project settings for No Limits 18+
 window.NO_LIMITS_SUPABASE = {
-  url: '',
-  publishableKey: ''
+  url: 'https://ravcpoexpskjzdqwaoab.supabase.co',
+  publishableKey: 'sb_publishable_t5PE5YfuE0rIi_aJJJuVHw_cyoMzJYe'
 };

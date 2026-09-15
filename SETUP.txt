@@ -1,33 +1,11 @@
-NO LIMITS 18+ – MULTIPLAYER BETA
+NO LIMITS 18+ – MULTIPLAYER
 
-Die App enthält:
-- Solo-Modus mit allen bisherigen Decks
-- Mehrspieler-Lobby per Code
-- Name pro Spieler
-- Live-Spielerliste
-- Host startet das Spiel und wählt die Kategorie
-- wechselnder Fragensteller
-- 30-Sekunden-Timer
-- Fragensteller wählt seine echte Antwort
-- alle anderen tippen gleichzeitig
-- +1 Punkt pro richtigem Tipp
-- Fragensteller erhält +1 pro Spieler, der ihn richtig einschätzt
-- automatische Auflösung und nächste Runde
+Supabase is configured for this build.
 
-SUPABASE VERBINDEN
-1. Auf supabase.com ein kostenloses Projekt erstellen.
-2. In Authentication die Anonymous Sign-Ins aktivieren.
-3. Im Supabase-Dashboard unter Connect / API die Project URL und den Publishable Key kopieren.
-4. Die Datei config.js öffnen und beide Werte einsetzen:
+Project URL:
+https://ravcpoexpskjzdqwaoab.supabase.co
 
-window.NO_LIMITS_SUPABASE = {
-  url: 'https://DEIN-PROJEKT.supabase.co',
-  publishableKey: 'sb_publishable_...'
-};
+The browser-safe Supabase publishable key is already inserted in config.js.
+Do NOT add a Supabase secret/service_role key to this project or GitHub.
 
-5. Die Dateien auf einen HTTPS-Webhost hochladen (z. B. GitHub Pages, Vercel oder Netlify).
-6. Auf mehreren Handys dieselbe URL öffnen.
-7. Ein Spieler erstellt eine Lobby, die anderen treten mit dem Code bei.
-
-HINWEIS
-Diese Beta nutzt einen Host-authoritativen Realtime-Raum. Der Host muss während der Partie online bleiben.
+Upload all files from this folder to your GitHub repository, then enable GitHub Pages.
