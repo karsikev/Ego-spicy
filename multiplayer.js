@@ -11,9 +11,11 @@
   const esc = s => String(s ?? '').replace(/[&<>\"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','\"':'&quot;',"'":'&#39;'}[c]));
   const code = () => Math.random().toString(36).slice(2,7).toUpperCase().replace(/[01OI]/g,'X');
   const now = () => Date.now();
+  const t = (key,vars={}) => window.NLI18N?.t(key,vars) || key;
+  const lang = () => window.NLI18N?.lang || 'de';
   const currentPlayers = () => [...players.values()].sort((a,b)=>(a.joinedAt||0)-(b.joinedAt||0));
   const me = () => players.get(uid);
-  const deckFor = category => window.decks?.[category] || (typeof decks!=='undefined'?decks[category]:[]);
+  const deckFor = category => window.NLI18N?.getDeck(category,state?.language||lang()) || window.decks?.[category] || [];
   function nextRandomQuestion(category){
     const deck=deckFor(category);
     if(!deck?.length) return 0;
@@ -24,7 +26,7 @@
   }
 
   async function ensureAuth(){
-    if(!configured) throw new Error('Supabase ist noch nicht verbunden.');
+    if(!configured) throw new Error(t('supabaseMissing'));
     if(!sb) sb = window.supabase.createClient(cfg.url, cfg.publishableKey);
     const { data:{session} } = await sb.auth.getSession();
     if(session){ uid=session.user.id; return; }
@@ -36,8 +38,8 @@
   function setHint(msg){ $('mpConfigHint').textContent=msg; }
   function renderPlayers(){
     const arr=currentPlayers();
-    $('mpPlayers').innerHTML=arr.map(p=>`<div class="playerChip"><span>${esc(p.name)}${p.uid===uid?' · du':''}${p.host?' 👑':''}</span><b>${state?.scores?.[p.uid]||0} P</b></div>`).join('');
-    $('lobbyStatus').textContent = `${arr.length} Spieler verbunden`;
+    $('mpPlayers').innerHTML=arr.map(p=>`<div class="playerChip"><span>${esc(p.name)}${p.uid===uid?' · '+t('you'):''}${p.host?' 👑':''}</span><b>${state?.scores?.[p.uid]||0} ${t('points')}</b></div>`).join('');
+    $('lobbyStatus').textContent = t('playersConnected',{count:arr.length});
   }
 
   function syncPresence(){
@@ -57,12 +59,12 @@
       .on('broadcast',{event:'guess'},({payload})=>{if(isHost) receiveGuess(payload)})
       .on('broadcast',{event:'owner_answer'},({payload})=>{if(isHost) receiveOwnerAnswer(payload)})
       .on('broadcast',{event:'sync_request'},()=>{if(isHost && state) broadcastState()})
-      .on('broadcast',{event:'session_end'},()=>{ if(!isHost) endLocalSession(false,'Der Host hat die Lobby beendet.'); })
+      .on('broadcast',{event:'session_end'},()=>{ if(!isHost) endLocalSession(false,t('hostEnded')); })
       .subscribe(async status=>{
         if(status==='SUBSCRIBED'){
           await channel.track({uid,name:myName,host:isHost,joinedAt:now()});
           if(isHost){
-            state={phase:'lobby',category:'18+',roundSeconds:selectedRoundSeconds,totalQuestions:selectedQuestionCount,turnUid:null,questionIndex:0,round:0,deadline:null,scores:{[uid]:0},reveal:null};
+            state={phase:'lobby',category:'18+',language:lang(),roundSeconds:selectedRoundSeconds,totalQuestions:selectedQuestionCount,turnUid:null,questionIndex:0,round:0,deadline:null,scores:{[uid]:0},reveal:null};
             show('mpLobby'); $('hostControls').classList.remove('hidden'); $('lobbyCodeDisplay').textContent=lobbyCode; broadcastState();
           } else {
             show('mpLobby'); $('hostControls').classList.add('hidden'); $('lobbyCodeDisplay').textContent=lobbyCode;
@@ -81,6 +83,7 @@
 
   function receiveState(s){
     state=s;
+    if(s?.language && window.NLI18N?.lang!==s.language) window.NLI18N.setLanguage(s.language,false);
     if(s.phase==='lobby'){ show('mpLobby'); renderPlayers(); return; }
     show('mpGame'); renderGame();
   }
@@ -93,23 +96,23 @@
   function renderGame(){
     if(!state) return;
     if(state.phase==='finished'){
-      $('mpWho').textContent='Spiel beendet';
+      $('mpWho').textContent=t('gameFinished');
       $('mpTimer').textContent='🏆';
-      $('mpQuestion').textContent=`${state.totalQuestions||state.round} Fragen gespielt`;
+      $('mpQuestion').textContent=t('questionsPlayed',{count:state.totalQuestions||state.round});
       $('mpAnswers').innerHTML='';
       $('mpReveal').classList.add('hidden');
       $('mpContinueBtn').classList.toggle('hidden',!isHost);
-      if(isHost){ $('mpContinueBtn').textContent='Zurück zur Lobby →'; }
+      if(isHost){ $('mpContinueBtn').textContent=t('backLobby'); }
       const scores=state.scores||{};
-      $('mpScores').innerHTML=currentPlayers().sort((a,b)=>(scores[b.uid]||0)-(scores[a.uid]||0)).map((p,i)=>`<div class="scoreLine"><span>${i===0?'👑 ':''}${esc(p.name)}</span><b>${scores[p.uid]||0} P</b></div>`).join('');
-      $('mpStatus').textContent=isHost?'Finale Rangliste – ihr könnt zurück zur Lobby oder ins Main Menu.':'Finale Rangliste – der Host entscheidet, wie es weitergeht.';
+      $('mpScores').innerHTML=currentPlayers().sort((a,b)=>(scores[b.uid]||0)-(scores[a.uid]||0)).map((p,i)=>`<div class="scoreLine"><span>${i===0?'👑 ':''}${esc(p.name)}</span><b>${scores[p.uid]||0} ${t('points')}</b></div>`).join('');
+      $('mpStatus').textContent=isHost?t('finalHost'):t('finalGuest');
       $('mpGameMainMenu')?.classList.toggle('hidden',!isHost);
       clearInterval(tick); tick=null;
       return;
     }
     const q=questionForState(); if(!q) return;
     const turn=players.get(state.turnUid);
-    $('mpWho').textContent=`${turn?.name||'Spieler'} ist dran · Frage ${state.round}/${state.totalQuestions||'?'}`;
+    $('mpWho').textContent=t('turnQuestion',{name:turn?.name||t('player'),round:state.round,total:state.totalQuestions||'?'});
     $('mpQuestion').textContent=q[0];
     $('mpReveal').classList.toggle('hidden',state.phase!=='reveal');
     const isOwner=uid===state.turnUid;
@@ -125,16 +128,16 @@
       $('mpAnswers').appendChild(btn);
     }
     const scores=state.scores||{};
-    $('mpScores').innerHTML=currentPlayers().sort((a,b)=>(scores[b.uid]||0)-(scores[a.uid]||0)).map(p=>`<div class="scoreLine"><span>${esc(p.name)}</span><b>${scores[p.uid]||0} P</b></div>`).join('');
+    $('mpScores').innerHTML=currentPlayers().sort((a,b)=>(scores[b.uid]||0)-(scores[a.uid]||0)).map(p=>`<div class="scoreLine"><span>${esc(p.name)}</span><b>${scores[p.uid]||0} ${t('points')}</b></div>`).join('');
     if(state.phase==='reveal'){
       const ans=state.reveal?.answer||'?';
       const correct=state.reveal?.correctNames||[];
-      $('mpReveal').innerHTML=`Richtige Antwort: <b>${ans}</b><br><span style="font-size:13px;color:#d9c9da">Richtig geraten: ${correct.length?correct.map(esc).join(', '):'niemand'}</span>`;
-      $('mpStatus').textContent=isHost?'Zeit zum Diskutieren – starte die nächste Runde, wenn ihr bereit seid.':'Zeit zum Diskutieren – der Host startet gleich die nächste Runde.';
+      $('mpReveal').innerHTML=t('correctAnswer',{answer:esc(ans),names:correct.length?correct.map(esc).join(', '):t('nobody')});
+      $('mpStatus').textContent=isHost?t('discussHost'):t('discussGuest');
       $('mpContinueBtn')?.classList.toggle('hidden',!isHost);
-      if(isHost) $('mpContinueBtn').textContent=(state.round>=state.totalQuestions)?'Ergebnis anzeigen →':'Weiter →';
+      if(isHost) $('mpContinueBtn').textContent=(state.round>=state.totalQuestions)?t('showResults'):t('continue');
     } else {
-      $('mpStatus').textContent=isOwner?'Wähle deine echte Antwort. Die anderen tippen gleichzeitig.':'Was glaubst du, welche Antwort gewählt wird?';
+      $('mpStatus').textContent=isOwner?t('ownerPrompt'):t('guessPrompt');
       $('mpContinueBtn')?.classList.add('hidden');
     }
     $('mpGameMainMenu')?.classList.toggle('hidden',!isHost);
@@ -178,7 +181,7 @@
     if(!isHost || !state || state.phase!=='answering') return;
     const answer=ownerAnswer || '—'; let correct=0, names=[];
     if(ownerAnswer){
-      for(const [pid,g] of guesses){ if(g===ownerAnswer){ state.scores[pid]=(state.scores[pid]||0)+1; correct++; names.push(players.get(pid)?.name||'Spieler'); } }
+      for(const [pid,g] of guesses){ if(g===ownerAnswer){ state.scores[pid]=(state.scores[pid]||0)+1; correct++; names.push(players.get(pid)?.name||t('player')); } }
       state.scores[state.turnUid]=(state.scores[state.turnUid]||0)+correct;
     }
     state.phase='reveal'; state.reveal={answer,correctNames:names}; state.deadline=null;
@@ -200,8 +203,8 @@
 
   function startGame(){
     if(!isHost) return;
-    const arr=currentPlayers(); if(arr.length<2){ $('lobbyStatus').textContent='Mindestens 2 Spieler benötigt.'; return; }
-    state.category=$('mpCategory').value; state.roundSeconds=selectedRoundSeconds; selectedQuestionCount=Math.max(1,Math.min(200,Number($('mpQuestionCount')?.value)||10)); state.totalQuestions=selectedQuestionCount; state.round=1; state.turnUid=arr[0].uid;
+    const arr=currentPlayers(); if(arr.length<2){ $('lobbyStatus').textContent=t('minPlayers'); return; }
+    state.category=$('mpCategory').value; state.language=lang(); state.roundSeconds=selectedRoundSeconds; selectedQuestionCount=Math.max(1,Math.min(200,Number($('mpQuestionCount')?.value)||10)); state.totalQuestions=selectedQuestionCount; state.round=1; state.turnUid=arr[0].uid;
     usedQuestions.clear(); state.questionIndex=nextRandomQuestion(state.category); state.phase='answering'; state.deadline=now()+(state.roundSeconds*1000); state.clientSelections={}; state.reveal=null;
     guesses.clear(); ownerAnswer=null; broadcastState();
   }
@@ -225,16 +228,16 @@
   async function hostMainMenu(){ if(!isHost) return; await endLocalSession(true); }
 
   async function createLobby(){
-    try{ myName=$('mpName').value.trim(); if(!myName) return setHint('Bitte zuerst deinen Namen eingeben.'); setHint('Verbinde …'); await connect(code(),true); }
+    try{ myName=$('mpName').value.trim(); if(!myName) return setHint(t('enterName')); setHint(t('connecting')); await connect(code(),true); }
     catch(e){ setHint(e.message||String(e)); }
   }
   async function joinLobby(){
-    try{ myName=$('mpName').value.trim(); const c=$('joinCode').value.trim().toUpperCase(); if(!myName) return setHint('Bitte zuerst deinen Namen eingeben.'); if(c.length<4) return setHint('Bitte Lobby-Code eingeben.'); setHint('Verbinde …'); await connect(c,false); }
+    try{ myName=$('mpName').value.trim(); const c=$('joinCode').value.trim().toUpperCase(); if(!myName) return setHint(t('enterName')); if(c.length<4) return setHint(t('enterCode')); setHint(t('connecting')); await connect(c,false); }
     catch(e){ setHint(e.message||String(e)); }
   }
 
   function init(){
-    $('mpConfigHint').textContent=configured?'Mehrspieler bereit.':'Mehrspieler ist vorbereitet – Supabase URL + Publishable Key fehlen noch.';
+    $('mpConfigHint').textContent=configured?t('mpReady'):t('mpMissing');
   }
   $('createLobbyBtn')?.addEventListener('click',createLobby);
   $('showJoinBtn')?.addEventListener('click',()=>$('joinArea').classList.toggle('hidden'));
@@ -258,5 +261,13 @@
     if(!isHost) return; selectedQuestionCount=Math.max(1,Math.min(200,Number(e.target.value)||10));
     if(state?.phase==='lobby') state.totalQuestions=selectedQuestionCount;
   });
-  window.NLMP={init};
+  function refreshLanguage(){ if(state) renderPlayers(); if(state?.phase && state.phase!=='lobby') renderGame(); else if(state?.phase==='lobby') renderPlayers(); else init(); }
+  function onLanguageChange(newLang){
+    if(!state){ refreshLanguage(); return; }
+    if(isHost && state.phase==='lobby'){ state.language=newLang; broadcastState(); return; }
+    if(state.language && window.NLI18N?.lang!==state.language) window.NLI18N.setLanguage(state.language,false);
+    refreshLanguage();
+  }
+  window.addEventListener('nolimits-language-change',e=>onLanguageChange(e.detail?.lang||lang()));
+  window.NLMP={init,refreshLanguage};
 })();
