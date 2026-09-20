@@ -1,4 +1,4 @@
-NO LIMITS 18+ – MULTIPLAYER
+NO LIMITS 18+ – MULTIPLAYER v7
 
 Supabase is configured for this build.
 
@@ -8,4 +8,11 @@ https://ravcpoexpskjzdqwaoab.supabase.co
 The browser-safe Supabase publishable key is already inserted in config.js.
 Do NOT add a Supabase secret/service_role key to this project or GitHub.
 
-Upload all files from this folder to your GitHub repository, then enable GitHub Pages.
+NEW: Anonymous Questions mode
+- Every player creates exactly 5 questions.
+- Every question requires 3 different answers: A, B and C.
+- The game never shows who wrote a question.
+- After everyone submits, the host starts the anonymously shuffled deck.
+- The number of rounds is automatically 5 × number of players.
+
+Upload all files from this folder to your GitHub repository, replacing the previous version, then let GitHub Pages redeploy.
