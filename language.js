@@ -24,7 +24,7 @@
   };
   let lang = localStorage.getItem('nl_lang') === 'en' ? 'en' : 'de';
   const dict = () => lang==='en' ? en : de;
-  const t=(key,vars={})=>{let s=dict()[key]??key;for(const [k,v] of Object.entries(vars))s=s.replaceAll(`{{${k}}}`,String(v));return s;};
+  const t=(key,vars={})=>{let s=dict()[key]??key;for(const [k,v] of Object.entries(vars)){const value=String(v);s=s.replaceAll(`{${k}}`,value).replaceAll(`{{${k}}}`,value);}return s;};
   const catLabel=(key)=>key==='18+'?t('catAdult'):key==='Lustig'?t('catFunny'):key==='Würdest du eher'?t('catWyr'):t('catRandom');
   function setText(id,key){const el=document.getElementById(id);if(el)el.textContent=t(key);}
   function applyStatic(){
