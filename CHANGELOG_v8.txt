@@ -1,0 +1,14 @@
+No Limits 18+ Multiplayer v8 – Spielvarianten
+
+NEU: Spielvariante in der Lobby
+- Klassisch: richtige Tipps +1 Punkt; Fragensteller +1 Punkt pro richtigem Tipp.
+- Chip Mode: Host wählt 10–30 Start-Chips pro Spieler.
+- Jeder Tippende setzt 1–2 Chips vor der Antwort.
+- Richtig: Einsatz bleibt erhalten und derselbe Betrag kommt als Gewinn hinzu (netto +Einsatz).
+- Falsch: Einsatz wird abgezogen.
+- KICKER: einmal pro Spieler und Partie; erlaubt einen Einsatz von bis zu 5 Chips.
+- Wer 0 Chips hat, setzt Tipp-Runden aus, kann als Fragensteller aber weiterhin antworten und Frager-Punkte sammeln.
+- Im Chip Mode entscheidet am Ende der Chipstand; Frager-Punkte werden separat mit ⭐ angezeigt.
+- Bei unbeantworteter Runde werden keine Chips verändert; ein dort eingesetzter KICKER wird nicht verbraucht.
+- Funktioniert auch mit „Anonyme Fragen“.
+- Deutsch/Englisch ergänzt.

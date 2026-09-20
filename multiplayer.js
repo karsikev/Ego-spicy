@@ -8,6 +8,8 @@
   let sb = null, channel = null, uid = null, myName = '', lobbyCode = '', isHost = false;
   let players = new Map(), state = null, guesses = new Map(), ownerAnswer = null, tick = null;
   let selectedRoundSeconds = 30, selectedQuestionCount = 10, usedQuestions = new Set();
+  let selectedGameVariant = 'classic', selectedStartingChips = 20;
+  let selectedBet = 1, kickerArmed = false, betRound = -1;
   let customSubmissions = new Map();
   let customDraft = freshCustomDraft(), customStep = 0, customSubmissionId = null, customSending = false;
 
@@ -72,16 +74,36 @@
     const sel=$('mpCategory');
     if(!sel) return;
     const custom=sel.value===CUSTOM;
+    const variant=isHost?selectedGameVariant:(state?.gameVariant||selectedGameVariant);
     $('questionCountBlock')?.classList.toggle('hidden',custom);
     $('customModeNote')?.classList.toggle('hidden',!custom);
+    $('startingChipsBlock')?.classList.toggle('hidden',variant!=='chips');
+    document.querySelectorAll('#mpVariantPicker .variantBtn').forEach(b=>b.classList.toggle('active',b.dataset.variant===variant));
+    const chipValue=isHost?selectedStartingChips:(state?.startingChips||selectedStartingChips); if($('mpStartingChipsRange')) $('mpStartingChipsRange').value=chipValue; if($('startingChipsValue')) $('startingChipsValue').textContent=chipValue;
+    if($('variantNote')) $('variantNote').textContent=t(variant==='chips'?'chipVariantNote':'classicVariantNote');
     if(custom && $('customModeNote')) $('customModeNote').textContent=t('customCountNote',{count:currentPlayers().length*CUSTOM_PER_PLAYER});
     if($('mpStartGame')) $('mpStartGame').textContent=custom?t('collectQuestions'):t('startGame');
   }
 
   function renderPlayers(){
     const arr=currentPlayers();
-    if($('mpPlayers')) $('mpPlayers').innerHTML=arr.map(p=>`<div class="playerChip"><span>${esc(p.name)}${p.uid===uid?' · '+t('you'):''}${p.host?' 👑':''}</span><b>${state?.scores?.[p.uid]||0} ${t('points')}</b></div>`).join('');
+    if($('mpPlayers')) $('mpPlayers').innerHTML=arr.map(p=>{
+      let stat='';
+      if(state?.phase && state.phase!=='lobby'){
+        stat=state.gameVariant==='chips'
+          ? `🪙 ${state.chips?.[p.uid]??0} · ⭐ ${state.scores?.[p.uid]||0}`
+          : `${state?.scores?.[p.uid]||0} ${t('points')}`;
+      }
+      return `<div class="playerChip"><span>${esc(p.name)}${p.uid===uid?' · '+t('you'):''}${p.host?' 👑':''}</span><b>${stat}</b></div>`;
+    }).join('');
     if($('lobbyStatus')) $('lobbyStatus').textContent = t('playersConnected',{count:arr.length});
+    if($('lobbySettingsSummary') && state){
+      const variant=state.gameVariant==='chips'?t('chipVariant'):t('classicVariant');
+      const category=window.NLI18N?.catLabel(state.category)||state.category;
+      const count=state.category===CUSTOM?t('customAutoCount',{count:arr.length*CUSTOM_PER_PLAYER}):t('questionCountSummary',{count:state.totalQuestions||selectedQuestionCount});
+      const chipPart=state.gameVariant==='chips'?` · ${t('startingChipsSummary',{count:state.startingChips||selectedStartingChips})}`:'';
+      $('lobbySettingsSummary').textContent=`${variant} · ${category} · ${state.roundSeconds||selectedRoundSeconds}s · ${count}${chipPart}`;
+    }
     updateLobbyModeUI();
   }
 
@@ -114,6 +136,7 @@
             state={
               phase:'lobby',category:'18+',language:lang(),roundSeconds:selectedRoundSeconds,
               totalQuestions:selectedQuestionCount,turnUid:null,questionIndex:0,round:0,deadline:null,
+              gameVariant:selectedGameVariant,startingChips:selectedStartingChips,chips:{},jokerUsed:{},
               scores:{[uid]:0},reveal:null,hostUid:uid
             };
             show('mpLobby');
@@ -149,6 +172,8 @@
         $('hostControls')?.classList.remove('hidden');
         const sel=$('mpCategory');
         if(sel && [...sel.options].some(o=>o.value===s.category)) sel.value=s.category;
+        selectedGameVariant=s.gameVariant||selectedGameVariant;
+        selectedStartingChips=Number(s.startingChips)||selectedStartingChips;
       } else $('hostControls')?.classList.add('hidden');
       renderPlayers();
       return;
@@ -169,8 +194,57 @@
 
   function renderScores(final=false){
     const scores=state?.scores||{};
+    if(state?.gameVariant==='chips'){
+      const chips=state?.chips||{};
+      const list=gamePlayers().sort((a,b)=>(chips[b.uid]||0)-(chips[a.uid]||0) || (scores[b.uid]||0)-(scores[a.uid]||0));
+      const top=list.length?(chips[list[0].uid]||0):0;
+      if($('mpScores')) $('mpScores').innerHTML=list.map(p=>`<div class="scoreLine"><span>${final&&(chips[p.uid]||0)===top?'👑 ':''}${esc(p.name)}</span><b>🪙 ${chips[p.uid]||0} · ⭐ ${scores[p.uid]||0}</b></div>`).join('');
+      return;
+    }
     const list=gamePlayers().sort((a,b)=>(scores[b.uid]||0)-(scores[a.uid]||0));
     if($('mpScores')) $('mpScores').innerHTML=list.map((p,i)=>`<div class="scoreLine"><span>${final&&i===0?'👑 ':''}${esc(p.name)}</span><b>${scores[p.uid]||0} ${t('points')}</b></div>`).join('');
+  }
+
+  function resetBetStateForRound(){
+    if(!state || betRound===state.round) return;
+    betRound=state.round;
+    selectedBet=1;
+    kickerArmed=false;
+  }
+
+  function renderChipControls(isOwner,locked){
+    const box=$('mpChipControls');
+    if(!box) return;
+    if(state?.gameVariant!=='chips' || isOwner || state?.phase==='finished'){
+      box.classList.add('hidden');
+      return;
+    }
+    box.classList.remove('hidden');
+    resetBetStateForRound();
+    const balance=Math.max(0,Number(state.chips?.[uid]||0));
+    const jokerUsed=!!state.jokerUsed?.[uid];
+    const maxBet=Math.min(balance,kickerArmed?5:2);
+    if(maxBet>0) selectedBet=Math.max(1,Math.min(selectedBet,maxBet));
+    $('chipBalanceText').textContent=t('chipBalance',{count:balance});
+    $('chipBetSummary').textContent=balance>0?t('chipBetSummary',{count:selectedBet}):t('chipBrokeShort');
+    $('chipBetLabel').textContent=t(kickerArmed?'kickerBetLabel':'chipBetLabel');
+    const wrap=$('chipBetButtons');
+    wrap.innerHTML='';
+    for(let n=1;n<=5;n++){
+      const b=document.createElement('button');
+      b.type='button'; b.className='betBtn'+(n===selectedBet?' active':''); b.textContent=String(n);
+      b.disabled=locked || n>maxBet || (!kickerArmed && n>2) || balance<=0;
+      b.onclick=()=>{ selectedBet=n; renderChipControls(false,false); };
+      wrap.appendChild(b);
+    }
+    const kicker=$('kickerBtn');
+    kicker.textContent=jokerUsed?t('kickerUsed'):t('kickerButton');
+    kicker.classList.toggle('active',kickerArmed&&!jokerUsed);
+    kicker.disabled=locked || jokerUsed || balance<=0;
+    $('chipLockedText').classList.toggle('hidden',!locked && balance>0);
+    if(locked) $('chipLockedText').textContent=t('chipBetLocked',{count:selectedBet});
+    else if(balance<=0) $('chipLockedText').textContent=t('chipBroke');
+    else $('chipLockedText').textContent='';
   }
 
   function renderGame(){
@@ -178,7 +252,7 @@
     if(state.phase==='finished'){
       $('mpWho').textContent=t('gameFinished');
       $('mpTimer').textContent='🏆';
-      $('mpQuestion').textContent=t('questionsPlayed',{count:state.totalQuestions||state.round});
+      $('mpQuestion').textContent=state.gameVariant==='chips'?t('chipQuestionsPlayed',{count:state.totalQuestions||state.round}):t('questionsPlayed',{count:state.totalQuestions||state.round});
       $('mpAnswers').innerHTML='';
       $('mpReveal').classList.add('hidden');
       $('mpContinueBtn').classList.toggle('hidden',!isHost);
@@ -197,14 +271,17 @@
     $('mpQuestion').textContent=q[0];
     $('mpReveal').classList.toggle('hidden',state.phase!=='reveal');
     const isOwner=uid===state.turnUid;
-    const myGuess=state.clientSelections?.[uid];
+    const rawSelection=state.clientSelections?.[uid];
+    const myGuess=typeof rawSelection==='string'?rawSelection:rawSelection?.letter;
+    renderChipControls(isOwner,!!myGuess || state.phase!=='answering');
     $('mpAnswers').innerHTML='';
     const count = state.category==='Würdest du eher'?2:3;
     for(let i=0;i<count;i++){
       const letter='ABC'[i], btn=document.createElement('button');
       btn.className='mpAnswer'+(myGuess===letter?' selected':'');
       btn.textContent=`${letter} · ${q[i+1]}`;
-      btn.disabled=state.phase!=='answering' || !!myGuess;
+      const broke=state.gameVariant==='chips' && !isOwner && (state.chips?.[uid]||0)<=0;
+      btn.disabled=state.phase!=='answering' || !!myGuess || broke;
       btn.onclick=()=>submitChoice(letter,isOwner);
       $('mpAnswers').appendChild(btn);
     }
@@ -213,12 +290,22 @@
     if(state.phase==='reveal'){
       const ans=state.reveal?.answer||'?';
       const correct=state.reveal?.correctNames||[];
-      $('mpReveal').innerHTML=t('correctAnswer',{answer:esc(ans),names:correct.length?correct.map(esc).join(', '):t('nobody')});
+      let revealHtml=t('correctAnswer',{answer:esc(ans),names:correct.length?correct.map(esc).join(', '):t('nobody')});
+      if(state.gameVariant==='chips'){
+        const rows=state.reveal?.chipResults||[];
+        if(rows.length){
+          revealHtml += `<div style="margin-top:12px;display:grid;gap:6px">${rows.map(r=>`<div style="display:flex;justify-content:space-between;gap:10px"><span>${esc(r.name)}${r.kicker?' 🔥':''}</span><b>${r.delta>0?'✅ +':'❌ '}${r.delta} 🪙</b></div>`).join('')}</div>`;
+        }
+        revealHtml += `<div style="margin-top:10px;font-size:12px;color:#d9c9da">${t('questionerGain',{count:state.reveal?.ownerGain||0})}</div>`;
+      }
+      $('mpReveal').innerHTML=revealHtml;
       $('mpStatus').textContent=isHost?t('discussHost'):t('discussGuest');
       $('mpContinueBtn')?.classList.toggle('hidden',!isHost);
       if(isHost) $('mpContinueBtn').textContent=(state.round>=state.totalQuestions)?t('showResults'):t('continue');
     } else {
-      $('mpStatus').textContent=isOwner?t('ownerPrompt'):t('guessPrompt');
+      if(isOwner) $('mpStatus').textContent=t('ownerPrompt');
+      else if(state.gameVariant==='chips' && (state.chips?.[uid]||0)<=0) $('mpStatus').textContent=t('chipBroke');
+      else $('mpStatus').textContent=state.gameVariant==='chips'?t('chipGuessPrompt'):t('guessPrompt');
       $('mpContinueBtn')?.classList.add('hidden');
     }
     $('mpGameMainMenu')?.classList.toggle('hidden',!isHost);
@@ -241,16 +328,47 @@
     if(!state || state.phase!=='answering') return;
     state.clientSelections=state.clientSelections||{};
     if(state.clientSelections[uid]) return;
+    if(isOwner){
+      state.clientSelections[uid]=letter;
+      renderGame();
+      send('owner_answer',{uid,letter,round:state.round});
+      return;
+    }
+    if(state.gameVariant==='chips'){
+      const balance=Math.max(0,Number(state.chips?.[uid]||0));
+      if(balance<=0) return;
+      const max=kickerArmed?5:2;
+      const bet=Math.max(1,Math.min(Number(selectedBet)||1,max,balance));
+      state.clientSelections[uid]={letter,bet,kicker:kickerArmed};
+      renderGame();
+      send('guess',{uid,letter,round:state.round,bet,kicker:kickerArmed});
+      kickerArmed=false;
+      return;
+    }
     state.clientSelections[uid]=letter;
     renderGame();
-    if(isOwner) send('owner_answer',{uid,letter,round:state.round});
-    else send('guess',{uid,letter,round:state.round});
+    send('guess',{uid,letter,round:state.round});
   }
 
   function receiveGuess(p){
     if(!state || p.round!==state.round || state.phase!=='answering') return;
-    if(!state.playerOrder?.includes(p.uid) || p.uid===state.turnUid) return;
-    guesses.set(p.uid,p.letter);
+    if(!state.playerOrder?.includes(p.uid) || p.uid===state.turnUid || guesses.has(p.uid)) return;
+    const answerCount=state.category==='Würdest du eher'?2:3;
+    if(!'ABC'.slice(0,answerCount).includes(p.letter)) return;
+    if(state.gameVariant==='chips'){
+      const balance=Math.max(0,Number(state.chips?.[p.uid]||0));
+      if(balance<=0) return;
+      const kicker=!!p.kicker;
+      if(kicker && state.jokerUsed?.[p.uid]) return;
+      const bet=Math.floor(Number(p.bet)||0);
+      const max=kicker?5:2;
+      if(bet<1 || bet>max || bet>balance) return;
+      guesses.set(p.uid,{letter:p.letter,bet,kicker});
+      state.jokerUsed=state.jokerUsed||{};
+      if(kicker) state.jokerUsed[p.uid]=true;
+    }else{
+      guesses.set(p.uid,{letter:p.letter,bet:0,kicker:false});
+    }
     checkEarlyFinish();
   }
 
@@ -262,26 +380,38 @@
 
   function checkEarlyFinish(){
     if(!isHost || !ownerAnswer) return;
-    const others=gamePlayers().filter(p=>p.uid!==state.turnUid);
-    if(others.length && others.every(p=>guesses.has(p.uid))) finishRound();
+    const others=gamePlayers().filter(p=>p.uid!==state.turnUid && (state.gameVariant!=='chips' || (state.chips?.[p.uid]||0)>0));
+    if(others.every(p=>guesses.has(p.uid))) finishRound();
   }
 
   function finishRound(){
     if(!isHost || !state || state.phase!=='answering') return;
     const answer=ownerAnswer || '—';
-    let correct=0, names=[];
+    let correct=0, names=[], chipResults=[];
     if(ownerAnswer){
       for(const [pid,g] of guesses){
-        if(g===ownerAnswer){
-          state.scores[pid]=(state.scores[pid]||0)+1;
+        const isCorrect=g.letter===ownerAnswer;
+        const playerName=players.get(pid)?.name || state.playerNames?.[pid] || t('player');
+        if(isCorrect){
           correct++;
-          names.push(players.get(pid)?.name || state.playerNames?.[pid] || t('player'));
+          names.push(playerName);
+          if(state.gameVariant==='chips'){
+            state.chips[pid]=(state.chips[pid]||0)+g.bet;
+            chipResults.push({uid:pid,name:playerName,bet:g.bet,kicker:!!g.kicker,delta:g.bet,correct:true});
+          }else{
+            state.scores[pid]=(state.scores[pid]||0)+1;
+          }
+        }else if(state.gameVariant==='chips'){
+          state.chips[pid]=Math.max(0,(state.chips[pid]||0)-g.bet);
+          chipResults.push({uid:pid,name:playerName,bet:g.bet,kicker:!!g.kicker,delta:-g.bet,correct:false});
         }
       }
       state.scores[state.turnUid]=(state.scores[state.turnUid]||0)+correct;
+    }else if(state.gameVariant==='chips'){
+      for(const [pid,g] of guesses){ if(g.kicker && state.jokerUsed) state.jokerUsed[pid]=false; }
     }
     state.phase='reveal';
-    state.reveal={answer,correctNames:names};
+    state.reveal={answer,correctNames:names,chipResults,ownerGain:correct};
     state.deadline=null;
     broadcastState();
   }
@@ -480,10 +610,14 @@
     state.category=$('mpCategory').value;
     state.language=lang();
     state.roundSeconds=selectedRoundSeconds;
+    state.gameVariant=selectedGameVariant;
+    state.startingChips=selectedStartingChips;
     state.hostUid=uid;
     state.playerOrder=arr.map(p=>p.uid);
     state.playerNames=Object.fromEntries(arr.map(p=>[p.uid,p.name]));
     state.scores=Object.fromEntries(arr.map(p=>[p.uid,0]));
+    state.chips=selectedGameVariant==='chips'?Object.fromEntries(arr.map(p=>[p.uid,selectedStartingChips])):{};
+    state.jokerUsed=Object.fromEntries(arr.map(p=>[p.uid,false]));
     state.turnUid=null;
     state.round=0;
     state.reveal=null;
@@ -520,7 +654,7 @@
     clearInterval(tick); tick=null;
     if(hostInitiated && channel){ try{ await send('session_end',{}); }catch(e){} }
     try{ if(channel){ await channel.untrack(); await channel.unsubscribe(); if(sb?.removeChannel) await sb.removeChannel(channel); } }catch(e){}
-    channel=null; lobbyCode=''; isHost=false; players.clear(); state=null; guesses.clear(); ownerAnswer=null; usedQuestions.clear(); customSubmissions.clear(); resetCustomLocal(null);
+    channel=null; lobbyCode=''; isHost=false; players.clear(); state=null; guesses.clear(); ownerAnswer=null; usedQuestions.clear(); customSubmissions.clear(); selectedBet=1; kickerArmed=false; betRound=-1; resetCustomLocal(null);
     hideAll();
     if(wasHost || hostInitiated){
       $('modePanel')?.classList.remove('hidden');
@@ -558,6 +692,7 @@
     state.customDeck=[]; state.customSubmitted={}; state.customReady=0; state.customTotalPlayers=0; state.submissionId=null;
     state.playerOrder=[]; state.playerNames={};
     state.scores=Object.fromEntries(currentPlayers().map(p=>[p.uid,0]));
+    state.chips={}; state.jokerUsed={}; state.gameVariant=selectedGameVariant; state.startingChips=selectedStartingChips;
     usedQuestions.clear(); guesses.clear(); ownerAnswer=null; customSubmissions.clear(); resetCustomLocal(null);
   }
 
@@ -584,9 +719,33 @@
   $('customPrevBtn')?.addEventListener('click',customPrev);
   $('customNextBtn')?.addEventListener('click',customNext);
   $('customStartDeckBtn')?.addEventListener('click',startCustomDeck);
+  document.querySelectorAll('#mpVariantPicker .variantBtn').forEach(btn=>btn.addEventListener('click',()=>{
+    if(!isHost || state?.phase!=='lobby') return;
+    selectedGameVariant=btn.dataset.variant==='chips'?'chips':'classic';
+    state.gameVariant=selectedGameVariant;
+    updateLobbyModeUI();
+    broadcastState();
+  }));
+  $('mpStartingChipsRange')?.addEventListener('input',e=>{
+    if(!isHost || state?.phase!=='lobby') return;
+    selectedStartingChips=Math.max(10,Math.min(30,Math.round(Number(e.target.value)||20)));
+    state.startingChips=selectedStartingChips;
+    if($('startingChipsValue')) $('startingChipsValue').textContent=selectedStartingChips;
+  });
+  $('mpStartingChipsRange')?.addEventListener('change',()=>{
+    if(!isHost || state?.phase!=='lobby') return;
+    broadcastState();
+  });
+  $('kickerBtn')?.addEventListener('click',()=>{
+    if(!state || state.phase!=='answering' || uid===state.turnUid || state.gameVariant!=='chips') return;
+    if(state.clientSelections?.[uid] || state.jokerUsed?.[uid] || (state.chips?.[uid]||0)<=0) return;
+    kickerArmed=!kickerArmed;
+    selectedBet=Math.min(selectedBet,kickerArmed?5:2,state.chips?.[uid]||1);
+    renderChipControls(false,false);
+  });
   $('mpCategory')?.addEventListener('change',()=>{
     if(!isHost) return;
-    if(state?.phase==='lobby') state.category=$('mpCategory').value;
+    if(state?.phase==='lobby'){ state.category=$('mpCategory').value; broadcastState(); }
     updateLobbyModeUI();
   });
 
@@ -594,13 +753,13 @@
     if(!isHost) return;
     selectedRoundSeconds=Number(btn.dataset.time)||30;
     document.querySelectorAll('#mpTimePicker .timeBtn').forEach(b=>b.classList.toggle('active',b===btn));
-    if(state?.phase==='lobby') state.roundSeconds=selectedRoundSeconds;
+    if(state?.phase==='lobby'){ state.roundSeconds=selectedRoundSeconds; broadcastState(); }
   }));
 
   $('mpQuestionCount')?.addEventListener('change',e=>{
     if(!isHost) return;
     selectedQuestionCount=Math.max(1,Math.min(200,Number(e.target.value)||10));
-    if(state?.phase==='lobby') state.totalQuestions=selectedQuestionCount;
+    if(state?.phase==='lobby'){ state.totalQuestions=selectedQuestionCount; broadcastState(); }
   });
 
   function refreshLanguage(){
