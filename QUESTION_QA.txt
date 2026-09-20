@@ -1,0 +1,10 @@
+QUESTION QA v6
+18+: 200 DE / 200 EN, answers=3
+Lustig: 200 DE / 200 EN, answers=3
+Würdest du eher: 200 DE / 200 EN, answers=2
+Random: 200 DE / 200 EN, answers=3
+No duplicate full cards per deck
+No empty questions/answers
+DE/EN answer counts aligned for every card
+Would-you-rather answers verified against question text
+Known malformed template patterns removed
